@@ -1,0 +1,498 @@
+---
+title: ' Impact de l''ECOWAP : Politique Agricole commune de l''Afrique de l''Ouest'
+author: ' Gyldano DADJEDJI, Kwami NOUCHET, Marc Anoumou TANO'
+date: "2024-12-16"
+output:
+  html_document:
+    toc: true
+    df_print: paged
+  pdf_document:
+    latex_engine: xelatex
+    toc: true
+    fig_caption: true
+    number_sections: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE, comment = "")
+```
+
+```{r}
+# Librairies
+library(dplyr)
+library(ggplot2)
+library(ggthemes)
+library(dplyr)
+library(stargazer)
+library(MatchIt)
+library(tidyverse) 
+library(broom)
+library(cobalt)
+```
+
+
+\newpage
+
+# Abstract
+
+This study evaluates the impact of the ECOWAP (Economic Community of West African States Agricultural Policy) on agricultural productivity, GDP, and CO2 emissions in West African countries. While regional agricultural policies are pivotal for food security and economic development, their broader effects on sustainability and economic growth remain insufficiently explored. Using both differences-in-differences (DiD) and matching methods, which yielded consistent results, this study compares the outcomes of ECOWAP member states to non-member countries over a defined period. The findings show a significant increase in agricultural productivity, particularly in cereal production, within ECOWAP countries. However, no significant effect was found on GDP or CO2 emissions.
+
+These results suggest that while ECOWAP has contributed to agricultural growth, its impact on broader economic performance and environmental sustainability remains limited. Further research is needed to refine the methodology and explore the policy’s long-term effects on economic integration, climate resilience, and sustainability.
+
+\newpage
+
+# Présentation
+
+Depuis son adoption en 2005, l’ECOWAP (Politique Agricole Commune de l’Afrique de l’Ouest) constitue un cadre de référence pour le développement agricole et économique des pays membres de la CEDEAO (Communauté Économique des États de l’Afrique de l’Ouest). Face aux défis liés à la sécurité alimentaire, à la compétitivité du secteur agricole, et aux effets du changement climatique, l’ECOWAP a été conçue comme une réponse intégrée pour stimuler la croissance, améliorer la durabilité des pratiques agricoles et réduire la pauvreté dans la région. Cette politique s’appuie sur des priorités stratégiques, notamment :
+
+- L’intégration régionale des marchés agricoles, permettant une meilleure circulation des produits et des facteurs de production.
+- L’amélioration des infrastructures agricoles, pour renforcer les capacités de production et les chaînes de valeur.
+- L’adoption de techniques agricoles durables, répondant aux contraintes environnementales et climatiques.
+
+Cependant, près de deux décennies après son lancement, l’impact de l’ECOWAP reste peu étudié de manière quantitative et rigoureuse. Cette évaluation se révèle cruciale pour mesurer les résultats obtenus, identifier les facteurs de succès et proposer des ajustements à la politique dans un contexte de pressions économiques, sociales et environnementales croissantes.
+
+L’objectif principal de ce projet est d’évaluer l’impact de l’ECOWAP sur la situation agricole et socio-économique des pays membres de la CEDEAO. Plus précisément, nous cherchons à répondre aux questions suivantes :
+
+- **Productivité agricole** : Dans quelle mesure l’ECOWAP a-t-elle contribué à améliorer la production agricole dans la région ?
+- **Environnement** : Quel a été son impact sur les émissions de gaz à effet de serre, en particulier le CO2, liées aux activités agricoles ?
+- **Richesse économique** : L’ECOWAP a-t-elle permis d’améliorer le PIB des pays membres de la CEDEAO ?
+
+# Base de donnée et statistiques descriptives
+
+Une aperçu de la base de données nous donne :
+
+
+```{r}
+#Importation de la base
+load("data_ECOWAP.RData")
+data_ECOWAP <- data_ECOWAP %>%
+  mutate(across(-Country, ~ as.numeric(as.character(.))))
+head(data_ECOWAP, 2)
+```
+
+Pour comparer les changements dans les variables avant et après l’adoption de l’ECOWAP, nous exploitons une expérience naturelle. L'appartenance au groupe de traitement ou de contrôle est déterminée par l’adhésion à la CEDEAO. Ainsi, les pays membres de la CEDEAO constituent le groupe de traitement, car ils sont directement concernés par l’ECOWAP, tandis que les pays d’Afrique subsaharienne aux caractéristiques similaires, mais non membres de la CEDEAO, forment le groupe de contrôle. Un aperçu des données des pays de la CEDEAO et des pays hors CEDEAO est présenté ci-dessous :
+
+```{r}
+#conversion des colonnes en numérique si besoin
+data_ECOWAP <- data_ECOWAP %>%
+  mutate(across(where(is.numeric), ~ ifelse(is.na(.), mean(., na.rm = TRUE), .)))
+
+#création de la période
+data_ECOWAP$periode <- ifelse(data_ECOWAP$Year < 2005, 0, 1)
+
+groupe_traitement <- data_ECOWAP %>%
+  filter(ECOWAS_Member == 1)
+
+groupe_controle <- data_ECOWAP %>%
+  filter(ECOWAS_Member == 0)
+
+noms_pays_traitement <- groupe_traitement$Country
+noms_pays_controle <- groupe_controle$Country
+
+# Afficher les noms des pays
+cat("Pays membres de la CEDEAO (groupe de traitement) :\n")
+print(unique(noms_pays_traitement))
+
+cat("\nPays non membres de la CEDEAO (groupe de contrôle) :\n")
+print(unique(noms_pays_controle))
+```
+
+
+Étant donné le nombre d'observations important, nous avons ajusté les valeurs manquantes en les remplaçant par les moyennes des colonnes correspondantes. Ainsi, les statistiques descriptives des États membres de la CEDEAO sont les suivantes:
+
+```{r}
+
+#Groupe de traitement avant et après 2005
+groupe_traitement_avant_2005 <- groupe_traitement %>%
+  filter(periode == 0)
+
+groupe_traitement_apres_2005 <- groupe_traitement %>%
+  filter(periode == 1)
+
+# Tableau pour le groupe avant 2005
+stargazer(
+  as.data.frame(groupe_traitement_avant_2005),
+  type = "text",          
+  title = "Résumé Statistique - Avant 2005",   
+  summary.stat = c("mean", "sd", "min", "max", "n")
+)
+
+# Tableau pour le groupe après 2005
+stargazer(
+  as.data.frame(groupe_traitement_apres_2005), 
+  type = "text",          
+  title = "Résumé Statistique - Après 2005",   
+  summary.stat = c("mean", "sd", "min", "max", "n")
+)
+
+```
+
+En comparaison, les statistiques des États hors de la CEDEAO sont les suivantes :
+
+```{r}
+#Groupe de controle avant et après 2005
+
+groupe_controle_avant_2005 <- groupe_controle %>%
+  filter(periode == 0)
+
+groupe_controle_apres_2005 <- groupe_controle %>%
+  filter(periode == 1)
+
+# Tableau pour le groupe avant 2005
+stargazer(
+  as.data.frame(groupe_controle_avant_2005),
+  type = "text",          
+  title = "Résumé Statistique - Avant 2005",   
+  summary.stat = c("mean", "sd", "min", "max", "n")
+)
+
+# Tableau pour le groupe après 2005
+stargazer(
+  as.data.frame(groupe_controle_apres_2005 ), 
+  type = "text",          
+  title = "Résumé Statistique - Après 2005",   
+  summary.stat = c("mean", "sd", "min", "max", "n")
+)
+```
+
+À première vue, les statistiques pour les pays de la CEDEAO montrent qu'il n'y a pas de changement majeur des émissions de CO2 après la mise en place de la politique, par rapport aux autres pays. Cependant, on constate une augmentation notable de l'indice de production agricole dans les pays de la CEDEAO, passant de 59/100 à 93/100 après l'implémentation de la politique, en comparaison avec les pays qui n'ont pas bénéficié de cette politique (augmentation de 73 à 95). Une tendance similaire est observée pour le PIB. On peut également noter qu'en moyenne, les besoins alimentaires restent insuffisants dans la région.
+
+# Effet causal
+
+## Mise en place de la méthode des doubles différences (DiD)
+
+### Théorie en amont de la méthode
+
+La méthode des Différences-en-Différences (DiD) permet d'estimer l'impact causal d'un traitement en comparant l’évolution d’un indicateur dans un groupe de traitement et un groupe témoin, avant et après l’événement. L'idée principale est de comparer l'évolution des deux groupes sur la période, en supposant qu'ils auraient évolué de manière similaire en l'absence du traitement.
+
+Le modèle de base pour estimer l'effet du traitement est exprimé par :
+
+
+$$Y_{it} = \alpha + \beta_1 Treat_i + \beta_2 Post_t + \beta_3 (Treat_i \times Post_t) + \epsilon_{it} $$
+
+où :
+- Y_{it}  : l'indicateur d'intérêt (par exemple, la productivité, les émissions de CO2, etc.)
+- Treat_i : variable binaire qui vaut 1 si l'unité appartient au groupe de traitement (sinon 0)
+- Post_t  : variable binaire qui vaut 1 si l'observation est après l'événement (sinon 0)
+- Treat_i*Post_t : interaction des deux variables représentant l'effet de traitement
+- epsilon_{it} : terme d'erreur
+
+Pour que les résultats de la méthode DiD soient valides, plusieurs hypothèses doivent être respectées :
+
+- **Tendance parallèle** : Cette hypothèse stipule que, sans traitement, les groupes de traitement et témoin auraient évolué de manière similaire. Mathématiquement, cela signifie :
+
+$$
+E[Y_{it} | Treat_i = 1, t < T] - E[Y_{it} | Treat_i = 0, t < T] = E[Y_{it} | Treat_i = 1, t \geq T] - E[Y_{it} | Treat_i = 0, t \geq T]
+$$
+
+- **Indépendance conditionnelle** : Après contrôle des facteurs pertinents, le traitement doit être indépendant des autres facteurs pouvant affecter l'issue observée.
+  
+- **Absence de contamination** : L'impact du traitement doit être limité au groupe de traitement, sans affecter le groupe témoin.
+
+Ces hypothèses sont essentielles pour garantir que les résultats de l'estimation par DiD reflètent un effet causal réel, et non un biais induit par des facteurs non pris en compte.
+
+Dans notre étude, nous nous concentrons principalement sur l'hypothèse des tendances parallèles, les deux autres hypothèses étant supposées vérifiées. En effet, nous partons du principe que les pays en dehors de la CEDEAO n'ont pas appliqué la politique, et que les facteurs influençant les résultats sont indépendants et contrôlés.
+
+
+### Vérification de l'hypothèse des tendances parallèles
+
+En analyse de double différence, l'hypothèse des tendances parallèles est cruciale pour la validité des résultats. Cette hypothèse suppose que, en l'absence de traitement, les deux groupes (traitement et contrôle) auraient évolué de manière similaire dans le temps. Si cette hypothèse n'est pas respectée (c'est-à-dire que les tendances ne sont pas parallèles avant le traitement), l'estimation du traitement pourrait être biaisée.
+
+Pour tester l'hypothèse des tendances parallèles, il est important de visualiser comment les variables cibles (comme l'indice de production agricole et les émissions de CO2) évoluent dans le temps, avant 2005, pour les pays de la CEDEAO et les pays qui ne font pas partie de cette organisation.
+
+```{r}
+# moyenne pour chaque variable
+df_controle <- groupe_controle %>%
+  group_by(Year) %>%
+  summarise(moyenne_crop_index = mean(Crop_Index, na.rm = TRUE),
+            moyenne_CO2 = mean(CO2_Emissions, na.rm = TRUE),
+            moyenne_GDP = mean(GDP_Per_Capita, na.rm = TRUE)) %>%
+  mutate(groupe = "Contrôle")
+
+df_traitement <- groupe_traitement %>%
+  group_by(Year) %>%
+  summarise(moyenne_crop_index = mean(Crop_Index, na.rm = TRUE),
+            moyenne_CO2 = mean(CO2_Emissions, na.rm = TRUE),
+            moyenne_GDP = mean(GDP_Per_Capita, na.rm = TRUE)) %>%
+  mutate(groupe = "Traitement")
+
+# Fusion des deux groupes pour représentation graphique
+df_fusion <- bind_rows(df_controle, df_traitement)
+
+# Graphique pour l'indice de production agricole
+ggplot(df_fusion) +
+  geom_line(aes(x = Year, y = moyenne_crop_index, color = groupe), size = 1) +
+  labs(title = "Comparaison des tendances de l'indice de production agricole avant 2005",
+       x = "Année",
+       y = "Moyenne de l'indice de production agricole",
+       color = "Groupe") +
+  scale_color_manual(values = c("Contrôle" = "red", "Traitement" = "blue")) +
+  geom_vline(xintercept = 2005, linetype = "dashed", color = "black") +  
+  annotate("text", x = 2005, y = max(df_fusion$moyenne_crop_index), label = "Politique", vjust = -1) + 
+  theme_minimal()
+```
+
+```{r}
+# Graphique pour le PIB par habitant (GDP_per_capita)
+ggplot(df_fusion) +
+  geom_line(aes(x = Year, y = moyenne_GDP, color = groupe), size = 1) +
+  labs(title = "Comparaison des tendances PIB par habitant avant 2005",
+       x = "Année",
+       y = "Moyenne du PIB par habitant",
+       color = "Groupe") +
+  scale_color_manual(values = c("Contrôle" = "red", "Traitement" = "blue")) +
+   geom_vline(xintercept = 2005, linetype = "dashed", color = "black") +  
+  annotate("text", x = 2005, y = max(df_fusion$moyenne_crop_index), label = "Politique", vjust = -1) + 
+  theme_minimal()
+```
+
+```{r}
+# Graphique pour les émissions de CO2
+ggplot(df_fusion) +
+  geom_line(aes(x = Year, y = moyenne_CO2, color = groupe), size = 1) +
+  labs(title = "Comparaison des émissions de CO2 avant 2005",
+       x = "Année",
+       y = "Moyenne des émissions de CO2",
+       color = "Groupe") +
+  scale_color_manual(values = c("Contrôle" = "red", "Traitement" = "blue")) +
+  geom_vline(xintercept = 2005, linetype = "dashed", color = "black") +
+  annotate("text", x = 2005, y = 1.05, label = "Politique", vjust = -1) +  
+  theme_minimal() +
+  ylim(-3, 3)
+```
+
+À partir de ces observations, on peut conclure qu'il existe approximativement une tendance parallèle pour l'indice de production agricole, le PIB par habitant et les émissions de CO2 par habitant entre les groupes avant le traitement. Par conséquent, nous pouvons appliquer directement la méthode des doubles différences simple. Cependant, il est important de prendre du recul par rapport à ces résultats, en l'absence de preuves statistiques solides confirmant cette tendance parallèle.
+
+### Application de la méthode
+
+#### Calcul de l'effet causal
+
+Nous procédons maintenant à l'analyse de l'effet causal de la politique à l'aide de la méthode des différences en différences. Les résultats du calcul des effets causaux montrent que :
+
+```{r}
+# Données pour l'analyse Difference-in-Difference
+data_ECOWAP <- data_ECOWAP %>%
+  mutate(post_trait = ifelse(Year > 2005, 1, 0)) # Période après 2005
+
+# Moyennes pour chaque groupe et chaque période
+diff_table <- data_ECOWAP %>%
+  group_by(post_trait, ECOWAS_Member) %>%
+  summarise(
+    mean_Crop_Index = mean(Crop_Index, na.rm = TRUE),
+    mean_CO2 = mean(CO2_Emissions, na.rm = TRUE),
+    mean_GDP_Constant = mean(GDP_Constant, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+# Calcul des doubles différences (DiD) pour chaque variable
+diff_in_diff_Crop_Index <- (diff_table$mean_Crop_Index[diff_table$post_trait == 1 & diff_table$ECOWAS_Member == 1] - 
+                            diff_table$mean_Crop_Index[diff_table$post_trait == 1 & diff_table$ECOWAS_Member == 0]) - 
+                           (diff_table$mean_Crop_Index[diff_table$post_trait == 0 & diff_table$ECOWAS_Member == 1] - 
+                            diff_table$mean_Crop_Index[diff_table$post_trait == 0 & diff_table$ECOWAS_Member == 0])
+
+diff_in_diff_CO2 <- (diff_table$mean_CO2[diff_table$post_trait == 1 & diff_table$ECOWAS_Member == 1] - 
+                     diff_table$mean_CO2[diff_table$post_trait == 1 & diff_table$ECOWAS_Member == 0]) - 
+                    (diff_table$mean_CO2[diff_table$post_trait == 0 & diff_table$ECOWAS_Member == 1] - 
+                     diff_table$mean_CO2[diff_table$post_trait == 0 & diff_table$ECOWAS_Member == 0])
+
+diff_in_diff_GDP_Per_Capita <- (diff_table$mean_GDP_Constant[diff_table$post_trait == 1 & diff_table$ECOWAS_Member == 1] - 
+                                diff_table$mean_GDP_Constant[diff_table$post_trait == 1 & diff_table$ECOWAS_Member == 0]) - 
+                               (diff_table$mean_GDP_Constant[diff_table$post_trait == 0 & diff_table$ECOWAS_Member == 1] - 
+                                diff_table$mean_GDP_Constant[diff_table$post_trait == 0 & diff_table$ECOWAS_Member == 0])
+
+# Tableau avec les résultats DiD
+resultats_DiD <- tibble::tibble(
+  Variable = c("Crop_Index", "CO2", "GDP"),
+  Effet_Causal_DiD = c(diff_in_diff_Crop_Index, diff_in_diff_CO2, diff_in_diff_GDP_Per_Capita),
+  Interpretation = c(
+    "Effet causal sur l'indice de production agricole (échelle 0-100)",
+    "Effet causal sur les émissions de CO2 (tonnes par habitant)",
+    "Effet causal sur le PIB (USD constant)"
+  )
+)
+
+print(resultats_DiD)
+```
+
+Pour le moment, il apparaît que la politique a conduit à une augmentation de la productivité agricole de plus de 11 points pour les pays membres de la CEDEAO. En revanche, les résultats concernant la production de CO2 et le PIB par habitant montrent des effets négatifs : une faible augmentation de 0,12 tonne de CO2 par habitant et une réduction du PIB par habitant de 8 milliards de dollars. En tenant compte de ces résultats, nous allons maintenant procéder à l'évaluation de la significativité de ces impacts.
+
+#### Significativité
+
+Nous commençons par effectuer le test de significativité pour l'indice de productivité agricole. Les résultats obtenus sont les suivants :
+
+```{r}
+# Modèle pour l'effet causal ajusté sur Crop_Index
+mod_crop_index <- lm(Crop_Index ~ ECOWAS_Member * post_trait + 
+                       GDP_Constant + Fertilizer_Use + 
+                       Population + Forest_Cover, data = data_ECOWAP)
+
+# Afficher les résultats pour Crop_Index
+stargazer(mod_crop_index, type = "text", title = "Tableau des Résultats du Modèle : Crop Index")
+```
+
+Nous obtenons une p-value inférieure à 1% pour le terme d'interaction ECOWAS_Member:post_trait, ce qui confirme la valeur calculée de l'effet causal. Nous pouvons donc conclure que la politique a eu un effet causal significatif sur la production agricole.
+
+En ce qui concerne les émissions de CO2, les résultats sont les suivants :
+
+```{r}
+
+# Modèle pour l'effet causal ajusté sur CO2_Emissions
+mod_CO2 <- lm(CO2_Emissions ~ ECOWAS_Member * post_trait + 
+               Population + Forest_Cover, data = data_ECOWAP)
+
+# Afficher les résultats pour CO2_Emissions
+stargazer(mod_CO2, type = "text", title = "Tableau des Résultats du Modèle : Emissions de CO2")
+```
+
+Le terme d'interaction ECOWAS_Member:post_trait n'a pas d'effet significatif, ce qui indique que la politique n'a pas eu d'impact significatif sur la production de gaz à effet de serre par habitant.
+
+```{r}
+# Modèle pour l'effet causal ajusté sur GDP_Per_Capita
+mod_PIB <- lm(GDP_Constant ~ ECOWAS_Member * post_trait + 
+               Corruption_Index + Unemployment_Rate + 
+               Population_Growth, data = data_ECOWAP)
+
+
+# Afficher les résultats pour GDP_Per_Capita
+stargazer(mod_PIB, type = "text", title = "Tableau des Résultats du Modèle : PIB par Habitant")
+```
+
+Le terme d'interaction ECOWAS_Member:post_trait n'a pas d'effet significatif, ce qui indique que la politique n'a pas eu d'impact significatif sur le PIB. On retrouve naturellement l'effet négatif du taux de croissance de la population.
+
+## Mise en place de la méthode du Matching
+
+### Théorie en amont de la méthode
+
+La méthode de matching vise à estimer un effet causal en comparant les unités traitées avec des unités non traitées similaires sur la base des caractéristiques observables. Elle repose sur la création d’un groupe de contrôle contrefactuel à partir des unités non traitées, afin de minimiser les biais liés aux différences initiales entre les deux groupes.
+
+L’objectif est d’estimer l’effet moyen du traitement sur les traités (ATT) :
+
+$$ATT = E[Y(1) - Y(0) | D = 1]$$
+
+où :
+- Y(1)  et Y(0)  sont les résultats potentiels (traité ou non),
+- D = 1  indique les unités traitées.
+
+Pour que les résultats de la méthode soient valides, plusieurs hypothèses doivent être respectées :
+
+
+ **Indépendance conditionnelle (CIA)**  : Les résultats potentiels Y(1) et Y(0) sont indépendants du statut de traitement D, conditionnellement aux covariables X :
+  $$
+   (Y(1), Y(0)) \perp D | X
+  $$
+
+Cela signifie que toutes les variables influençant à la fois le traitement et les résultats sont observables.
+
+**Support commun: **  
+   Pour chaque valeur des covariables X , la probabilité de recevoir le traitement D doit être strictement comprise entre 0 et 1 :
+   $$ 0 < P(D = 1 | X) < 1$$
+Cette condition garantit qu'il existe des unités traitées et non traitées avec des caractéristiques similaires X.
+
+
+### Appariement et vérification de l'hypothèse du support commun (qualité d'appariement)
+
+Dans cette analyse, nous commençons par estimer le score de propension à l'aide d'une régression logistique, qui mesure la probabilité qu'un pays soit membre de la CEDEAO en fonction des autres variables de notre base, indépendamment des variables cibles. Ensuite, nous appliquons une méthode d'appariement sur ce score pour créer des groupes comparables de pays membres et non-membres de la CEDEAO. Nous utilisons ensuite des visualisations graphiques pour évaluer la qualité de l'appariement. 
+
+Cette approche nous permet de garantir la validité de nos résultats avant de procéder à l'estimation des effets de la politique.
+
+```{r}
+set.seed(19)
+# Score de propension avec une régression logistique
+model_psm <- glm(ECOWAS_Member ~ GDP_Constant + Fertilizer_Use + Population + Forest_Cover, 
+                 family = binomial(link = "logit"), 
+                 data = data_ECOWAP)
+
+# Ajout du score de propension dans le jeu de données
+data_ECOWAP$propensity_score <- predict(model_psm, type = "response")
+
+# Matching sur le score de propension
+match_model <- matchit(ECOWAS_Member ~ GDP_Constant + Fertilizer_Use + Population + Forest_Cover, data = data_ECOWAP)
+
+# Données appariées
+matched_data <- match.data(match_model)
+plot(match_model,type="hist") 
+```
+
+On peut donc observer clairement que les scores de propension, avant et après l'appariement, deviennent très similaires après le matching, ce qui témoigne de l'efficacité de l'appariement.
+
+Ensuite, nous visualisons l'équilibre des covariables avant et après l'appariement, afin de renforcer la robustesse de l'appariement. Le graphique suivant illustre cette comparaison : 
+
+```{r}
+library(cobalt)
+love.plot(match_model, threshold = 0.1)
+```
+
+On peut remarquer qu'avant l'appariement, les déséquilibres entre les variables sont relativement réduits, ce qui indique que les groupes sont désormais plus comparables. Cela permet alors de mettre en œuvre la méthode de manière fiable.
+
+### Application de la méthode
+
+```{r}
+# Régression linéaire sur Crop_Index avec l'interaction
+mod_matched <- lm(Crop_Index ~ ECOWAS_Member * post_trait + GDP_Constant + Fertilizer_Use + Population + Forest_Cover, 
+                  data = matched_data)
+summary(mod_matched)
+```
+
+On peut donc observer que le terme d'interaction **ECOWAS_Member:post_trait** a un effet significatif sur la productivité agricole. 
+
+```{r}
+mod_CO2_matched <- lm(CO2_Emissions ~ ECOWAS_Member * post_trait + Population + Forest_Cover, 
+                      data = matched_data)
+
+# Afficher les résultats pour CO2_Emissions
+summary(mod_CO2_matched)
+```
+
+
+```{r}
+# Répéter le processus pour PIB per capita
+mod_PIB_matched <- lm(GDP_Constant ~ ECOWAS_Member * post_trait + Corruption_Index + Unemployment_Rate + Population_Growth, 
+                      data = matched_data)
+
+# Afficher les résultats pour PIB per capita
+summary(mod_PIB_matched)
+```
+
+De même, avec la méthode des doubles différences, nous n'observons pas d'effet significatif du terme d'interaction **ECOWAS_Member:post_trait** sur les émissions de CO2 et le PIB.
+
+
+# Discussion des résultats par rapport à la littérature existante
+
+Les résultats de notre étude fournissent une perspective importante sur l'impact de la politique agricole de la CEDEAO (ECOWAP) sur la productivité agricole, les émissions de CO2 et le PIB par habitant dans les pays membres de l'organisation. En comparant nos résultats avec la littérature existante, nous pouvons mettre en lumière les contributions uniques de notre étude ainsi que les points de convergence et de divergence avec les analyses précédentes.
+
+## Impact sur la productivité agricole
+
+Notre étude montre une augmentation significative de l'indice de production agricole de plus de 11 points dans les pays membres de la CEDEAO, confirmant ainsi un effet causal positif de la politique ECOWAP. Cependant, bien que ces progrès soient notables, la productivité reste insuffisante pour répondre pleinement aux besoins de la région. Ce constat rejoint les résultats du **Rapport de Suivi & Évaluation de l’ECOWAP (2016-2018)** établi par la CEDEAO, qui note des avancées dans certains domaines, mais souligne des défis persistants pour transformer durablement l'agriculture. **Nwozor et Olanrewaju (2020)** partagent cette observation, soulignant que malgré l'amélioration des rendements, la productivité ne suffit pas pour atteindre la sécurité alimentaire et la compétitivité globale de la région.
+
+## Impact sur les émissions de CO2
+
+Concernant l'impact sur les émissions de CO2, notre étude révèle qu'aucun effet notable n'a été observé, ce qui suggère que la politique ECOWAP n'a pas conduit à une réduction significative des gaz à effet de serre par habitant. Ce constat est en accord avec certaines observations dans la littérature, notamment celle de **Bendech (2016)**, qui signale les défis liés à l'intégration des préoccupations environnementales dans les politiques agricoles régionales. Cependant, nos résultats apportent un éclairage important en soulignant explicitement l'absence d'impact dans le contexte spécifique de la CEDEAO. L'absence de changement notable pourrait s’expliquer par une focalisation historique de la politique agricole sur l’augmentation de la production alimentaire sans prendre en compte les dimensions écologiques, un point que la littérature antérieure, notamment **Bendech**, n’avait pas spécifiquement abordé. Nous allons ainsi au-delà des études précédentes en apportant une évaluation rigoureuse sur ce point, qui pourrait conduire à une réorientation des politiques pour mieux intégrer la durabilité environnementale.
+
+## Impact sur le PIB par habitant
+
+En ce qui concerne le PIB par habitant, nos résultats montrent une légère diminution, bien que non significative. Cela suggère que la politique agricole de la CEDEAO n’a pas eu un impact direct sur la richesse par habitant dans les pays membres. Cette absence d'impact notable contraste avec l’évaluation de **Nwozor et Olanrewaju (2020)**, qui soulignent la faible performance économique du Nigeria malgré les efforts alignés avec l'ECOWAP et le PDDAA. Notre étude offre une nouvelle perspective en constatant que même dans les pays qui ont amélioré leur productivité agricole, les effets sur la croissance économique restent limités, ce qui pourrait indiquer que l'augmentation de la production agricole ne s'est pas traduite par une augmentation substantielle du revenu national ou par une diversification de l'économie. Cette analyse souligne le besoin de politiques agricoles qui ne se contentent pas de stimuler la production mais qui intègrent aussi des éléments visant à renforcer la compétitivité économique et à promouvoir une croissance économique durable.
+
+## Apports uniques de notre étude
+
+Notre étude se distingue par son approche méthodologique rigoureuse, appliquant des méthodes d’analyse causale robustes pour estimer l'impact de la politique ECOWAP sur plusieurs indicateurs clés. Nous avons démontré que, bien que la politique ait eu un effet positif sur la productivité agricole, son impact sur les émissions de CO2 et le PIB par habitant reste limité, une conclusion qui n'était pas explicitement abordée explicitement dans les études précédentes. 
+
+\newpage
+
+# Conclusion
+
+En conclusion, bien que l’ECOWAP ait indéniablement eu un impact positif sur la productivité agricole dans les pays membres de la CEDEAO, les effets sur les émissions de CO2 et le PIB demeurent faibles. Cela suggère que des ajustements dans la politique agricole, notamment en matière de durabilité environnementale et d’intégration économique, pourraient être nécessaires pour maximiser l'impact de cette politique à l’avenir. Cependant, il est essentiel de prendre du recul au regard de la nature académique de cette étude. Pour des méthodes comme les différences-en-différences (DiD), qui nécessitent une robustesse accrue dans la validation des hypothèses, il est nécessaire de mener des analyses plus approfondies. Comme le soulignent Bertrand, Duflo et Mullainathan (2004) dans leur étude sur la confiance à accorder aux estimations DiD, des vérifications supplémentaires et des approches méthodologiques adaptées, telles que des tests de robustesse et des analyses de sensibilité, sont cruciales pour garantir la fiabilité des conclusions.
+Les résultats de notre étude apportent une contribution importante à la littérature existante en précisant les limites de l'impact de l’ECOWAP, et offrent des pistes pour de futures recherches et réformes politiques dans la région.
+
+\newpage
+
+# Bibliographie
+
+1. Benjamin, C., & Houee-Bigot, M. (2023). *Cours Master 2 SDDP, Évaluation d'impact des politiques publiques, Évaluation (théorie et TD application)*.
+
+2. Bendech, M. A. (2016). *Évaluation de l’impact de l’ECOWAP sur l’agriculture et la nutrition en Afrique de l’Ouest : Enseignements tirés et perspectives*. FAO, Rome.
+
+3. Nwozor, A., & Olanrewaju, J. S. (2020). *La politique agricole de la CEDEAO et la quête de la sécurité alimentaire : évaluation des stratégies de mise en œuvre du Nigeria*. Journal of Agriculture and Food Security, 5(2), 45-58.
+
+4. Cunningham, S. (2021). *Causal Inference: The Mixtape*. Yale University Press.
+
+5. Bertrand, M., Duflo, E., & Mullainathan, S. (2004). "How much should we trust differences-in-differences estimates?". *Quarterly Journal of Economics*, 119(1), 249-275.
