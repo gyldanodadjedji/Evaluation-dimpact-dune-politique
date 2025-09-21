@@ -40,6 +40,6 @@ Ces résultats suggèrent que l’ECOWAP a **contribué à la croissance agricol
 
 ## Données et fichiers
 - Les données utilisées et le rapport complet peuvent être inclus dans ce dépôt sous les dossiers :  
-  - `data/` → jeux de données  
-  - `rapport/` → rapport complet en PDF  
+  - `data_ECOWAP` → jeux de données  
+  - `PROJET` → rapport complet en PDF  
 
