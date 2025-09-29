@@ -37,9 +37,3 @@ Ces résultats suggèrent que l’ECOWAP a **contribué à la croissance agricol
   - la durabilité agricole et environnementale.
 
 ---
-
-## Données et fichiers
-- Les données utilisées et le rapport complet peuvent être inclus dans ce dépôt sous les dossiers :  
-  - `data_ECOWAP` → jeux de données  
-  - `PROJET` → rapport complet en PDF  
-
